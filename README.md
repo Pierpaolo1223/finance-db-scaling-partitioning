@@ -10,9 +10,8 @@ Follow these steps to initialize the experiment and test the architecture under 
 
    ```bash
    cp .env.example .env
+   # Open your .env file and set your DB_PASSWORD
    ```
-
-# Open your .env file and set your DB_PASSWORD
 
 ### 2. Infrastructure Startup
 Use Docker to spin up the PostgreSQL instance with the 64MB memory restriction configured for this test:
