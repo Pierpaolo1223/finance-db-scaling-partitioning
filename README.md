@@ -59,12 +59,17 @@ To simulate high-pressure environments where data exceeds available memory, we r
 ALTER SYSTEM SET shared_buffers = '64MB'; -- Restart PostgreSQL service after this
 ```
 
-### 3. Note on OS Page Cache & Contextual Choice
-While PostgreSQL leverages the **OS Page Cache**, partitioning ensures that the database "touches" significantly fewer pages. This results in fewer system calls and higher cache density for the relevant dataset. 
+### 3. Memory Residency & OS Page Cache Interference
+PostgreSQL relies heavily on the **OS Page Cache**. In a monolithic setup, a large sequential scan "pollutes" the cache with cold data, evicting critical hot pages (like those from the `users` or `sessions` tables). 
 
-**The "It Depends" Principle**: 
-- **Static/Slow-Growth Datasets (e.g., User Directories)**: In scenarios with stable, non-transactional data, standard indexing is often the superior choice due to lower complexity and overhead.
-- **High-Growth/Transactional Datasets**: For systems expected to scale 100x (Hyper-growth), partitioning is a strategic necessity to prevent "Monolith Bloat" and ensure operational survival.
+Partitioning solves this via **Working Set Isolation**: 
+- Only the active partition's pages are pulled into memory.
+- It reduces **CPU Context Switching** by minimizing the number of system calls required to swap pages in/out of the `shared_buffers`.
+- It ensures a higher **Cache Hit Ratio** for the rest of the application ecosystem.
+
+**The "It Depends" Principle (Architecture over Dogma)**: 
+- **Low-Churn/Static Datasets**: Standard indexing remains the gold standard for simplicity and low overhead.
+- **High-Churn/Hyper-growth Datasets**: Partitioning is an operational survival requirement to prevent **Index Bloat** and IOPS starvation.
 
 ## Script Execution Order
 
