@@ -6,19 +6,27 @@ This project explores PostgreSQL performance and architectural scalability for f
 
 Follow these steps to initialize the experiment and test the architecture under load:
 
-### 1. Infrastructure Startup
+### 1. Copy the example file:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+# Open your .env file and set your DB_PASSWORD
+
+### 2. Infrastructure Startup
 Use Docker to spin up the PostgreSQL instance with the 64MB memory restriction configured for this test:
 ```bash
 docker compose up -d
 ```
 
-### 2. Database Access
+### 3. Database Access
 Access the container to interact directly with the transactions dataset:
 ```bash
 docker exec -it finance_scaling_experiment psql -U postgres -d transactions
 ```
 
-### 3. Query Monitoring
+### 4. Query Monitoring
 To monitor active queries, their duration, and resource status in real-time during load tests, run the following SQL command:
 
 ```sql
@@ -33,7 +41,7 @@ WHERE state != 'idle'
 ```
 Tip: Use this command to verify if the data ingestion process has been completed before starting your benchmarks.
 
-### 4. Running Benchmarks
+### 5. Running Benchmarks
 Execute the various comparison queries provided in the **queries** table. This allows you to directly measure the performance gap between the monolithic and partitioned tables on your own hardware, observing how **Partition Pruning** effectively minimizes physical I/O.
 
 ---
