@@ -2,6 +2,17 @@
 
 This project explores PostgreSQL performance and architectural scalability for financial datasets. It compares a standard "flat" monolithic table against a **hybrid partitioning** strategy, simulating the infrastructure of a company designed to scale to **Unicorn levels within 5 years**.
 
+## Prerequisites
+
+To ensure reproducible results and strict resource isolation, this experiment requires:
+
+*   **Docker & Docker Compose**: Used to containerize the PostgreSQL instance.
+*   **Resource Constraints**: The architecture is intentionally tested with a **64MB memory limit** (configured in `docker-compose.yml`) to simulate high-pressure I/O scenarios and validate partitioning efficiency over simple RAM caching.
+*   **Environment Setup**: A `.env` file is required to inject secrets into the container without hardcoding them in the infrastructure layer.
+
+---
+<br>
+
 ## Installation and Monitoring
 
 Follow these steps to initialize the experiment and test the architecture under load:
