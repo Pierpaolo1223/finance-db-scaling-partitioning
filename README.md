@@ -15,7 +15,7 @@ docker compose up -d
 ### 2. Database Access
 Access the container to interact directly with the transactions dataset:
 ```bash
-docker exec -it finance_scaling_experiment psql -U <your username> -d transactions
+docker exec -it finance_scaling_experiment psql -U postgres -d transactions
 ```
 
 ### 3. Query Monitoring
