@@ -1,4 +1,3 @@
-
 SET synchronous_commit = off;
 
 INSERT INTO transactions.transactions_partitioned (id, user_id, amount, created_at)

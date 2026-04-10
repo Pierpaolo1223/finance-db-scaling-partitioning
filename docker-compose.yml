@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  finance-db:
+    image: postgres:14.22
+    container_name: finance_scaling_experiment
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=transactions
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./scripts:/docker-entrypoint-initdb.d 
+      - postgres_data:/var/lib/postgresql/data 
+    command: >
+      postgres 
+      -c shared_buffers=64MB 
+      -c max_wal_size=1GB 
+      -c min_wal_size=80MB
+      -c log_statement=none
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d transactions"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

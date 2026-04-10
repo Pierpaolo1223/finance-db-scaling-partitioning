@@ -2,64 +2,64 @@
 
 This project explores PostgreSQL performance and architectural scalability for financial datasets. It compares a standard "flat" monolithic table against a **hybrid partitioning** strategy, simulating the infrastructure of a company designed to scale to **Unicorn levels within 5 years**.
 
-## The "Strategic vs Technical" Vision
+## Installation and Monitoring
 
-While a 20M record dataset (approx. 1.5GB) currently fits into modern RAM, this project adopts partitioning as a **preventive architectural choice**. 
+Follow these steps to initialize the experiment and test the architecture under load:
 
-In an enterprise hyper-growth phase, transaction tables must compete for RAM with users, notifications, and other critical services. Designing for partitioning "Day 1" is a strategic investment: it avoids catastrophic technical debt and high-risk, multi-terabyte migrations when the dataset inevitably hits the "RAM Wall" (moving from 20M to 2B+ records).
+### 1. Infrastructure Startup
+Use Docker to spin up the PostgreSQL instance with the 64MB memory restriction configured for this test:
+```bash
+docker compose up -d
+```
 
-### The T2D3 Growth Projection
-This architecture is built following the **T2D3 model** (Triple, Triple, Double, Double, Double) — the gold standard for SaaS hyper-growth. Starting with 20M annual records, a successful company can expect to manage over **1.4 Billion records within 5 years** (a ~72x increase). Implementing partitioning at the 20M stage is a proactive move to ensure the database layer never becomes the bottleneck during this exponential expansion.
+### 2. Database Access
+Access the container to interact directly with the transactions dataset:
+```bash
+docker exec -it finance_scaling_experiment psql -U <your username> -d transactions
+```
 
-## Architecture: Hybrid Partitioning
+### 3. Query Monitoring
+To monitor active queries, their duration, and resource status in real-time during load tests, run the following SQL command:
 
+```sql
+SELECT 
+    pid, 
+    now() - query_start AS duration, 
+    query, 
+    state
+FROM pg_stat_activity
+WHERE state != 'idle' 
+  AND query NOT LIKE '%pg_stat_activity%';
+```
+Tip: Use this command to verify if the data ingestion process has been completed before starting your benchmarks.
+
+### 4. Running Benchmarks
+Execute the various comparison queries provided in the **queries** table. This allows you to directly measure the performance gap between the monolithic and partitioned tables on your own hardware, observing how **Partition Pruning** effectively minimizes physical I/O.
+
+---
+<br>
+
+## Architecture & Strategy
+
+### The "Strategic vs Technical" Vision (T2D3 Model)
+While a 20M record dataset (~1.5GB) fits in RAM today, this project adopts partitioning as a **preventive architectural choice**. 
+
+Following the **T2D3 model** (Triple, Triple, Double, Double, Double), a successful SaaS can grow from 20M to **1.4 Billion records within 5 years**. Designing for partitioning "Day 1" avoids catastrophic technical debt and high-risk, multi-terabyte migrations when the dataset inevitably hits the "RAM Wall."
+
+### Hybrid Partitioning Structure
 To optimize both time-based reporting and user-specific lookups, we implemented a two-level hierarchy:
-
 - **Level 1 (Range)**: Monthly partitions based on `created_at`.
 - **Level 2 (Hash)**: Each monthly partition is further sub-partitioned into **4 Hash buckets** based on `user_id` to balance I/O.
 
-**Note on Indexing**: To isolate the structural benefits of **Partition Pruning**, this experiment deliberately uses **only Primary Keys**. This ensures the measured performance gap is due to architectural efficiency and I/O reduction, rather than specific query tuning.
+*Note: To isolate the benefits of Partition Pruning, this experiment uses **only Primary Keys**. This ensures performance gains are due to architectural efficiency, not specific query tuning.*
 
-## Synergizing Indexing and Partitioning
+### Why Partitioning Over Simple Indexing?
+*   **Cache Protection**: Prevents "Cache Pollution" by loading only relevant partitions into `shared_buffers`, avoiding thrashing.
+*   **Efficient Data Lifecycle**: Removing old data via `DROP TABLE` is instantaneous and generates **zero bloat**, unlike massive `DELETE` operations.
+*   **Maintenance Predictability**: Tasks like `REINDEX` or `VACUUM` are performed on smaller shards, providing operational isolation and preventing global table locks.
+*   **Automation**: In production, tools like `pg_partman` should be used to automate shard creation and retention.
 
-It is important to note that in production environments, **indexing and partitioning are complementary**, not mutually exclusive:
-
-- **Indexing (Pure Speed)**: Provides the microscopic efficiency needed to find specific rows within a dataset.
-- **Partitioning (Systemic Efficiency)**: Provides the macroscopic structure needed to keep indexes manageable, ensure cache density, and enable administrative agility.
-
-**Operational Best Practice**: Typically, in high-volume scenarios, the architecture is **partitioned first, then indexed**. This ensures that indexes remain local to each shard, reducing maintenance overhead and improving bulk ingestion speed.
-
-## Why Partitioning Over Simple Indexing?
-
-Beyond raw query speed, partitioning provides critical **Operational Scalability**:
-
-- **Cache Protection & Thrashing Prevention**: By leveraging **Partition Pruning**, the engine avoids loading irrelevant data into the `shared_buffers`. This prevents "Cache Pollution," ensuring that heavy analytical queries don't evict critical application data from memory.
-- **Efficient Data Lifecycle (DROP vs DELETE)**: Managing 10 years of data requires surgical precision. Removing old months via `DROP TABLE` is instantaneous and generates **zero bloat**, whereas a massive `DELETE` on a monolith would choke the Autovacuum for hours.
-- **Maintenance Predictability & Lock Mitigation**: Maintenance tasks like `REINDEX` or `VACUUM` are performed on smaller, manageable shards. This provides **operational isolation**: a lock on a specific shard doesn't affect the availability of the rest of the dataset.
-
-## Automation & Production Readiness
-
-In a real-world production environment, partition management should not be manual. 
-
-- **pg_partman**: For a truly scalable architecture, tools like **`pg_partman`** should be used to automate shard creation and data retention. 
-- **Infrastructure as Code**: This setup is designed to be integrated into CI/CD pipelines, ensuring the schema evolves seamlessly with company growth.
-
-## Benchmarks & Environment Setup
-
-To simulate high-pressure environments where data exceeds available memory, we restricted the PostgreSQL Buffer Pool to force **physical I/O**.
-
-### 1. Hardware & Software
-- **Database**: PostgreSQL 14.22
-- **Processor**: Intel Core i7-6700HQ (4 Cores, 8 Threads @ 2.60GHz)
-- **System Memory**: 16GB DDR4
-- **OS**: Linux
-
-### 2. Limit the Buffer Pool
-```sql
-ALTER SYSTEM SET shared_buffers = '64MB'; -- Restart PostgreSQL service after this
-```
-
-### 3. Memory Residency & OS Page Cache Interference
+### Memory Residency & OS Page Cache Interference
 PostgreSQL relies heavily on the **OS Page Cache**. In a monolithic setup, a large sequential scan "pollutes" the cache with cold data, evicting critical hot pages (like those from the `users` or `sessions` tables). 
 
 Partitioning solves this via **Working Set Isolation**: 
@@ -67,19 +67,19 @@ Partitioning solves this via **Working Set Isolation**:
 - It reduces **CPU Context Switching** by minimizing the number of system calls required to swap pages in/out of the `shared_buffers`.
 - It ensures a higher **Cache Hit Ratio** for the rest of the application ecosystem.
 
+---
+<br>
+
 **The "It Depends" Principle (Architecture over Dogma)**: 
 - **Low-Churn/Static Datasets**: Standard indexing remains the gold standard for simplicity and low overhead.
 - **High-Churn/Hyper-growth Datasets**: Partitioning is an operational survival requirement to prevent **Index Bloat** and IOPS starvation.
 
+---
+<br>
+
 ## Key Takeaways & Conclusions
 
-- **Architecture beats Hardware**: Even with restricted memory (64MB), a well-partitioned system usually outperformed the monolith by minimizing I/O overhead.
-- **Operational Resilience**: Partitioning is not just about query speed; it’s about making maintenance (backups, reindexing, purging) predictable and safe without global table locks.
-- **Future-Proofing**: Implementing this strategy during the early stages of growth (e.g., 20M-40M records) prevents massive technical debt when reaching the **T2D3 Unicorn scale** of billions of rows.
-- **System Hygiene**: Sharding enables instant data lifecycle management via `DROP/DETACH`, preventing **Autovacuum saturation** and permanent index bloat.
-
-## Script Execution Order
-
-1. **`scripts/setup_infrastructure.sql`**: Infrastructure setup. Identifiers are handled via **`%I`** (PostgreSQL format) to ensure metadata integrity and SQL safety.
-2. **`scripts/data_ingestion.sql`**: Populates ~20M records for both partitioned and large table.
-3. **`scripts/check_distribution.sql`**: Verifies the hybrid strategy.
+> - **Architecture beats Hardware**: Even with restricted memory (64MB), a well-partitioned system usually outperformed the monolith by minimizing I/O overhead.
+> - **Operational Resilience**: Partitioning is not just about query speed; it’s about making maintenance (backups, reindexing, purging) predictable and safe without global table locks.
+> - **Future-Proofing**: Implementing this strategy during early growth (20M-40M records) prevents massive technical debt when reaching the **T2D3 Unicorn scale** (billions of rows).
+> - **System Hygiene**: Sharding enables instant data lifecycle management via `DROP/DETACH`, preventing **Autovacuum saturation** and permanent index bloat.
