@@ -71,6 +71,13 @@ Partitioning solves this via **Working Set Isolation**:
 - **Low-Churn/Static Datasets**: Standard indexing remains the gold standard for simplicity and low overhead.
 - **High-Churn/Hyper-growth Datasets**: Partitioning is an operational survival requirement to prevent **Index Bloat** and IOPS starvation.
 
+## Key Takeaways & Conclusions
+
+- **Architecture beats Hardware**: Even with restricted memory (64MB), a well-partitioned system usually outperformed the monolith by minimizing I/O overhead.
+- **Operational Resilience**: Partitioning is not just about query speed; it’s about making maintenance (backups, reindexing, purging) predictable and safe without global table locks.
+- **Future-Proofing**: Implementing this strategy during the early stages of growth (e.g., 20M-40M records) prevents massive technical debt when reaching the **T2D3 Unicorn scale** of billions of rows.
+- **System Hygiene**: Sharding enables instant data lifecycle management via `DROP/DETACH`, preventing **Autovacuum saturation** and permanent index bloat.
+
 ## Script Execution Order
 
 1. **`scripts/setup_infrastructure.sql`**: Infrastructure setup. Identifiers are handled via **`%I`** (PostgreSQL format) to ensure metadata integrity and SQL safety.
