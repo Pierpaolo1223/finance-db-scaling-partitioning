@@ -51,7 +51,24 @@ WHERE state != 'idle'
 ```
 Tip: Use this command to verify if the data ingestion process has been completed before starting your benchmarks.
 
-### 5. Running Benchmarks
+### 5. Adding Indexes
+To add index in your system, do these following 2 queries:
+
+```sql
+CREATE INDEX idx_user_behavior_large_covering 
+ON transactions.transactions_large (user_id, created_at)
+INCLUDE (amount);
+```
+
+```sql
+CREATE INDEX idx_user_behavior_partitioned_covering 
+ON transactions.transactions_partitioned (user_id, created_at)
+INCLUDE (amount);
+```
+
+For the partitioned index, I know that in production contexts we use the "CONCURRENTLY" on each leaf partition, but for simplicity I used the above one.
+
+### 6. Running Benchmarks
 Execute the various comparison queries provided in the **queries** table. This allows you to directly measure the performance gap between the monolithic and partitioned tables on your own hardware, observing how **Partition Pruning** effectively minimizes physical I/O.
 
 ---
